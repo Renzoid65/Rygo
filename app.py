@@ -1,5 +1,5 @@
 # app.py
-
+python app.py
 # ========== IMPORTS ==========
 import os
 import pickle
@@ -9,6 +9,10 @@ import psycopg2
 import psycopg2.extras  # for RealDictCursor (named dict rows)
 import json
 import ast
+
+# This will be imported by Render via gunicorn/uvicorn
+import app as rygo_app
+gradio_app = rygo_app.main_app()
 
 # Encryption for DB config + active-user pickle
 try:
@@ -640,10 +644,13 @@ def main_app():
     return app
 
 # ========== ENTRY POINT ==========
+#if __name__ == "__main__":
+#    app = main_app()
+#    app.launch()
+#   # app.launch(server_name="127.0.0.1", server_port=7860, inbrowser=True, show_error=True)
+
 if __name__ == "__main__":
     app = main_app()
-    app.launch()
-    # app.launch(server_name="127.0.0.1", server_port=7860, inbrowser=True, show_error=True)
-
+    app.launch(server_name="0.0.0.0", server_port=10000)
 
 
