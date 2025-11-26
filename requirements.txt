@@ -1,0 +1,7 @@
+gradio
+cryptography
+pandas
+psycopg2-binary
+qrcode
+pycountry==22.3.5
+phonenumberslite==8.13.40
