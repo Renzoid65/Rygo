@@ -348,7 +348,7 @@ def main_app():
     # Ensure no stale value at process start; user must enter a UserID each run.
     os.environ.pop("OPENQR_ACTIVE_USER_ID", None)
 
-    with gr.Blocks(css=APP_CSS) as app:
+    with gr.Blocks() as app:
         # Global CSS
         gr.HTML(f"<style>{TAB_CSS}</style>")
 
