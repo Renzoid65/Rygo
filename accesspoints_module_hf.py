@@ -16,7 +16,6 @@ import time
 import json
 import os
 
-
 # ===== Optional QR: try qrcode, else Pillow fallback (no crash on Spaces) =====
 try:
     import qrcode  # external; may not exist on Spaces
