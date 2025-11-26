@@ -6,3 +6,4 @@ qrcode
 pycountry==22.3.5
 phonenumberslite==8.13.40
 gradio==4.44.0
+huggingface_hub==0.25.2
