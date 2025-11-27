@@ -5,7 +5,7 @@ import os
 import pickle
 from pathlib import Path
 import gradio as gr
-import gradio.routes as gr_routes
+import gradio_client.utils as grc_utils
 import psycopg2
 import psycopg2.extras  # for RealDictCursor (named dict rows)
 import json
@@ -29,6 +29,33 @@ from installers_module_hf import launch_installers_module
 
 # Close any old Gradio demos
 gr.close_all()   # prevents old demos re-rendering
+
+# ========== PATCH: WORK AROUND GRADIO BOOL-SCHEMA BUG ==========
+try:
+    _orig_get_type = grc_utils.get_type
+
+    def _safe_get_type(schema):
+        """
+        Wrap gradio_client.utils.get_type so it doesn't crash when schema is a bare bool.
+        This avoids:
+            TypeError: argument of type 'bool' is not iterable
+        """
+        # Buggy case: schema is True/False instead of a dict
+        if isinstance(schema, bool):
+            # Treat it as a generic "bool" type (or "any" if you prefer)
+            return "bool"
+
+        # Extra guard: if somehow it's None or not a dict-like schema
+        if schema is None:
+            return "any"
+
+        # Fall back to original behavior for normal schemas
+        return _orig_get_type(schema)
+
+    grc_utils.get_type = _safe_get_type
+except Exception as e:
+    print(f"WARNING: failed to patch gradio_client.get_type: {e}")
+# ===============================================================
 
 # ========== PATCH: SAFE api_info TO AVOID GRADIO SCHEMA BUG ON RENDER ==========
 def _safe_api_info(serialize: bool = False):
@@ -594,10 +621,10 @@ if __name__ == "__main__":
     # On Render, we don't need to open a local browser, and localhost isn't accessible
     # so we set share=True to skip the localhost self-check, and disable browser open.
     app.launch(
-        server_name="0.0.0.0",
-        server_port=port,
-        share=True,              # avoids the "localhost not accessible" error
-        inbrowser=False,         # don't try to open a browser in the container
-        show_error=True,
-        prevent_thread_lock=True # keep process responsive under uvicorn
-    )
+    server_name="0.0.0.0",
+    server_port=port,
+    share=False,             # no external Gradio tunnel; Render handles the URL
+    inbrowser=False,
+    show_error=True,
+    prevent_thread_lock=True
+)
