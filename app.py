@@ -4,12 +4,45 @@
 import os
 import pickle
 from pathlib import Path
-import gradio as gr
-import gradio_client.utils as grc_utils
 import psycopg2
 import psycopg2.extras  # for RealDictCursor (named dict rows)
 import json
 import ast
+import gradio as gr
+import gradio_client.utils as grc_utils
+
+# ---- PATCH: make gradio_client.utils.get_type robust to non-dict schemas ----
+try:
+    _orig_get_type = grc_utils.get_type
+except AttributeError:
+    _orig_get_type = None
+
+def _safe_get_type(schema):
+    """
+    Work around a Gradio bug where get_type() assumes `schema` is a dict.
+    On Render we sometimes see schema=True (bool), which causes:
+        TypeError: argument of type 'bool' is not iterable
+    inside the original get_type implementation.
+    For any non-dict schema, just treat as "Any".
+    """
+    # If schema is not a dict (e.g. True / False), don't try to inspect keys
+    if not isinstance(schema, dict):
+        print("DEBUG: safe_get_type handling non-dict schema:", repr(schema))
+        return "Any"
+
+    if _orig_get_type is None:
+        # Fallback: best-effort guess
+        return str(schema.get("type", "Any"))
+
+    try:
+        return _orig_get_type(schema)
+    except Exception as e:  # very defensive
+        print("DEBUG: safe_get_type caught error for schema", repr(schema), "error:", repr(e))
+        return "Any"
+
+# Apply monkeypatch
+grc_utils.get_type = _safe_get_type
+# ---- END PATCH ----
 
 # Encryption for DB config + active-user pickle
 try:
@@ -585,22 +618,15 @@ def main_app():
     return app
 
 # ========== ENTRY POINT ==========
+
 if __name__ == "__main__":
-    # Render provides PORT in the environment
-    port = int(os.environ.get("PORT", 10000))
-
-    app = main_app()
-
-    # Optional: enable queue if you were using it on HF
-    # app = app.queue()
-
-    # On Render, we don't need to open a local browser, and localhost isn't accessible
-    # so we set share=True to skip the localhost self-check, and disable browser open.
+    # If run directly (e.g. `python app.py`), launch the Gradio server as usual.
+    print("DEBUG (__main__): launching Gradio app directly.")
     app.launch(
-    server_name="0.0.0.0",
-    server_port=port,
-    share=False,             # no external Gradio tunnel; Render handles the URL
-    inbrowser=False,
-    show_error=True,
-    prevent_thread_lock=True
-)
+        server_name="0.0.0.0",
+        server_port=int(os.getenv("PORT", "10000")),  # Render provides PORT
+        share=True,  # <-- IMPORTANT: allow Gradio to run even if localhost is not directly reachable
+        allowed_paths=[str(CONFIG_DIR)],
+        root_path="/",
+        show_error=True,
+    )
