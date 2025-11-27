@@ -40,16 +40,10 @@ try:
         This avoids:
             TypeError: argument of type 'bool' is not iterable
         """
-        # Buggy case: schema is True/False instead of a dict
         if isinstance(schema, bool):
-            # Treat it as a generic "bool" type (or "any" if you prefer)
             return "bool"
-
-        # Extra guard: if somehow it's None or not a dict-like schema
         if schema is None:
             return "any"
-
-        # Fall back to original behavior for normal schemas
         return _orig_get_type(schema)
 
     grc_utils.get_type = _safe_get_type
@@ -57,26 +51,8 @@ except Exception as e:
     print(f"WARNING: failed to patch gradio_client.get_type: {e}")
 # ===============================================================
 
-# ========== PATCH: SAFE api_info TO AVOID GRADIO SCHEMA BUG ON RENDER ==========
-def _safe_api_info(serialize: bool = False):
-    """
-    Minimal stub for Gradio's /info endpoint.
 
-    This bypasses the internal json_schema_to_python_type/get_type logic
-    that is currently crashing with:
-        TypeError: argument of type 'bool' is not iterable
-    """
-    return {
-        "named_endpoints": {},
-        "dependencies": [],
-        "config": {},
-        "mode": "blocks",
-        "enable_queue": False,
-    }
 
-# Monkey-patch Gradio's route api_info before the app is created
-gr_routes.api_info = _safe_api_info
-# ========================================================================
 
 # ========== STYLES ==========
 
