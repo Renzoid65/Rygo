@@ -5,6 +5,7 @@ import os
 import pickle
 from pathlib import Path
 import gradio as gr
+import gradio.routes as gr_routes
 import psycopg2
 import psycopg2.extras  # for RealDictCursor (named dict rows)
 import json
@@ -28,6 +29,27 @@ from installers_module_hf import launch_installers_module
 
 # Close any old Gradio demos
 gr.close_all()   # prevents old demos re-rendering
+
+# ========== PATCH: SAFE api_info TO AVOID GRADIO SCHEMA BUG ON RENDER ==========
+def _safe_api_info(serialize: bool = False):
+    """
+    Minimal stub for Gradio's /info endpoint.
+
+    This bypasses the internal json_schema_to_python_type/get_type logic
+    that is currently crashing with:
+        TypeError: argument of type 'bool' is not iterable
+    """
+    return {
+        "named_endpoints": {},
+        "dependencies": [],
+        "config": {},
+        "mode": "blocks",
+        "enable_queue": False,
+    }
+
+# Monkey-patch Gradio's route api_info before the app is created
+gr_routes.api_info = _safe_api_info
+# ========================================================================
 
 # ========== STYLES ==========
 
