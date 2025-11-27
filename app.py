@@ -561,6 +561,21 @@ def main_app():
 
 # ========== ENTRY POINT ==========
 if __name__ == "__main__":
+    # Render provides PORT in the environment
+    port = int(os.environ.get("PORT", 10000))
+
     app = main_app()
-    port = int(os.getenv("PORT", "10000"))
-    app.launch(server_name="0.0.0.0", server_port=port)
+
+    # Optional: enable queue if you were using it on HF
+    # app = app.queue()
+
+    # On Render, we don't need to open a local browser, and localhost isn't accessible
+    # so we set share=True to skip the localhost self-check, and disable browser open.
+    app.launch(
+        server_name="0.0.0.0",
+        server_port=port,
+        share=True,              # avoids the "localhost not accessible" error
+        inbrowser=False,         # don't try to open a browser in the container
+        show_error=True,
+        prevent_thread_lock=True # keep process responsive under uvicorn
+    )
