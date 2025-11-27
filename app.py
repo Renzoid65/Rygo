@@ -618,15 +618,23 @@ def main_app():
     return app
 
 # ========== ENTRY POINT ==========
+# Build the Gradio Blocks app once so it's available as a global
+demo = main_app()
 
 if __name__ == "__main__":
-    # If run directly (e.g. `python app.py`), launch the Gradio server as usual.
     print("DEBUG (__main__): launching Gradio app directly.")
-    app.launch(
+
+    # On Render, PORT is provided via environment variable.
+    # Fallback to 10000 so it still runs locally if PORT is missing.
+    port = int(os.getenv("PORT", "10000"))
+
+    # IMPORTANT:
+    # - server_name must be 0.0.0.0 so Render can reach it
+    # - Do NOT use prevent_thread_lock=True on Render,
+    #   we want this call to block while serving HTTP.
+    demo.launch(
         server_name="0.0.0.0",
-        server_port=int(os.getenv("PORT", "10000")),  # Render provides PORT
-        share=True,  # <-- IMPORTANT: allow Gradio to run even if localhost is not directly reachable
-        allowed_paths=[str(CONFIG_DIR)],
-        root_path="/",
-        show_error=True,
+        server_port=port,
+        share=False,
+        show_api=False,
     )
