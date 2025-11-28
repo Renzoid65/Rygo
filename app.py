@@ -43,6 +43,22 @@ def _safe_get_type(schema):
 # Apply monkeypatch
 grc_utils.get_type = _safe_get_type
 # ---- END PATCH ----
+# put near your existing Gradio monkey-patch section
+
+import gradio.blocks as gr_blocks
+
+_orig_get_api_info = gr_blocks.Blocks.get_api_info
+
+def _safe_get_api_info(self, *args, **kwargs):
+    try:
+        return _orig_get_api_info(self, *args, **kwargs)
+    except Exception as e:
+        print(f"DEBUG: Blocks.get_api_info swallowed error: {e!r}", flush=True)
+        return {}
+
+gr_blocks.Blocks.get_api_info = _safe_get_api_info
+
+
 
 # Encryption for DB config + active-user pickle
 try:
@@ -635,6 +651,8 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=port,
-        share=False,
-        show_api=False,
+        share=True,          # ← here
+        inbrowser=False,
+        show_error=True,
+        prevent_thread_lock=True,
     )
