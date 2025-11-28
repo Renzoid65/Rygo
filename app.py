@@ -635,24 +635,30 @@ def main_app():
 
 # ========== ENTRY POINT ==========
 # Build the Gradio Blocks app once so it's available as a global
-demo = main_app()
 
 if __name__ == "__main__":
-    print("DEBUG (__main__): launching Gradio app directly.")
+    # Render provides PORT in the environment (as a string); default to 10000 for local tests
+    port = int(os.environ.get("PORT", "10000"))
 
-    # On Render, PORT is provided via environment variable.
-    # Fallback to 10000 so it still runs locally if PORT is missing.
-    port = int(os.getenv("PORT", "10000"))
+    app = main_app()
 
-    # IMPORTANT:
-    # - server_name must be 0.0.0.0 so Render can reach it
-    # - Do NOT use prevent_thread_lock=True on Render,
-    #   we want this call to block while serving HTTP.
-    demo.launch(
+    # Optional: enable queue if you were using it on HF
+    # app = app.queue()
+
+    print("DEBUG (__main__): launching Gradio app directly on Render.")
+
+    # IMPORTANT for Render:
+    # - share=False  -> no gradio.live tunnel; Render exposes the service.
+    # - prevent_thread_lock=False (default) -> launch() BLOCKS so the process stays alive.
+    app.launch(
         server_name="0.0.0.0",
         server_port=port,
-        share=True,          # ← here
+        share=False,
         inbrowser=False,
-        show_error=True,
-        prevent_thread_lock=True,
+        show_error=True
+        # prevent_thread_lock is left as default (False) so the process does NOT exit early
     )
+
+
+
+
