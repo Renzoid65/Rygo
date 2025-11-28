@@ -9,9 +9,28 @@ import psycopg2.extras  # for RealDictCursor (named dict rows)
 import json
 import ast
 import gradio as gr
+import gradio as gr
+
+# --- Gradio patches for Render / headless environments -----------------------
+# 1) Disable Gradio's localhost self-check that raises:
+#    "When localhost is not accessible, a shareable link must be created..."
+try:
+    from gradio import networking as _gr_networking  # type: ignore[attr-defined]
+
+    def _url_ok_always_true(*args, **kwargs) -> bool:
+        # On Render, the app is reachable via the platform's routing layer even
+        # if Gradio's internal localhost check fails. We just tell Gradio "OK".
+        return True
+
+    _gr_networking.url_ok = _url_ok_always_true  # type: ignore[assignment]
+except Exception as _e:
+    print("DEBUG: could not patch gradio.networking.url_ok:", _e)
+# -----------------------------------------------------------------------------
+
+
+import psycopg2
 import gradio_client.utils as grc_utils
 
-# ========== PATCH: WORK AROUND GRADIO BOOL-SCHEMA + DATAFRAME BUG ==========
 # ========== PATCH: WORK AROUND GRADIO BOOL-SCHEMA + DATAFRAME BUG ==========
 try:
     from gradio_client import utils as grc_utils
