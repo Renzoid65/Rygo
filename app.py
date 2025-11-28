@@ -12,13 +12,14 @@ import gradio as gr
 import gradio_client.utils as grc_utils
 
 # ========== PATCH: WORK AROUND GRADIO BOOL-SCHEMA + DATAFRAME BUG ==========
+# ========== PATCH: WORK AROUND GRADIO BOOL-SCHEMA + DATAFRAME BUG ==========
 try:
     from gradio_client import utils as grc_utils
 except Exception as e:
     print(f"WARNING: could not import gradio_client.utils for patching: {e}")
 else:
     try:
-        # 1) Patch get_type (existing fix)
+        # 1) Patch get_type (handles bare bool / None schemas)
         _orig_get_type = grc_utils.get_type
 
         def _safe_get_type(schema):
@@ -39,33 +40,30 @@ else:
 
         def _safe_json_schema_to_python_type(*args, **kwargs):
             """
-            Wrap gradio_client.utils.json_schema_to_python_type so that if it
-            explodes (RecursionError, APIInfoParseError, TypeError, etc.),
-            we fall back to a generic 'any' type instead of killing /info.
-            """
-            try:
-                return _orig_json_schema_to_python_type(*args, **kwargs)
-            except Exception as e:
-                schema = args[0] if args else None
-                # Keep log short but useful
-                try:
-                    schema_preview = str(schema)
-                    if len(schema_preview) > 200:
-                        schema_preview = schema_preview[:200] + "...(truncated)..."
-                except Exception:
-                    schema_preview = repr(schema)
+            Safe wrapper for gradio_client.utils.json_schema_to_python_type.
 
-                print(
-                    "DEBUG: safe_json_schema_to_python_type fallback; "
-                    f"schema={schema_preview} error: {repr(e)}"
-                )
-                # Fallback type – enough for Gradio's API discovery to work
+            Newer Gradio versions sometimes call it with (schema, defs).
+            The original implementation in your environment only accepts a
+            single positional argument, so we:
+
+            - always extract the first argument as the schema
+            - only ever pass that single schema into the original function
+            - if anything goes wrong, fall back to 'any'
+            """
+            schema = args[0] if args else None
+            try:
+                # Always call original with ONE positional argument.
+                return _orig_json_schema_to_python_type(schema)
+            except Exception:
+                # Quiet fallback; returning 'any' is enough for /info.
                 return "any"
 
         grc_utils.json_schema_to_python_type = _safe_json_schema_to_python_type
 
     except Exception as e:
         print(f"WARNING: failed to patch gradio_client utils: {e}")
+# ==================================================================
+
 # ==================================================================
 
 # Apply monkeypatch
