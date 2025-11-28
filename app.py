@@ -11,52 +11,61 @@ import ast
 import gradio as gr
 import gradio_client.utils as grc_utils
 
-# ---- PATCH: make gradio_client.utils.get_type robust to non-dict schemas ----
 # ========== PATCH: WORK AROUND GRADIO BOOL-SCHEMA + DATAFRAME BUG ==========
 try:
-    # 1) Patch get_type (your existing fix)
-    _orig_get_type = grc_utils.get_type
-
-    def _safe_get_type(schema):
-        """
-        Wrap gradio_client.utils.get_type so it doesn't crash when schema is a
-        bare bool.
-        This avoids:
-            TypeError: argument of type 'bool' is not iterable
-        """
-        if isinstance(schema, bool):
-            return "bool"
-        if schema is None:
-            return "any"
-        return _orig_get_type(schema)
-
-    grc_utils.get_type = _safe_get_type
-
-    # 2) NEW: Patch json_schema_to_python_type to swallow the DataframeData recursion
-    _orig_json_schema_to_python_type = grc_utils.json_schema_to_python_type
-
-    def _safe_json_schema_to_python_type(schema, defs=None):
-        """
-        Wrap gradio_client.utils.json_schema_to_python_type so that if it
-        explodes (e.g. RecursionError / APIInfoParseError on DataframeData),
-        we just fall back to a generic 'any' type instead of killing /info.
-        This keeps the Gradio frontend from showing 'Error - no API found'.
-        """
-        try:
-            return _orig_json_schema_to_python_type(schema, defs)
-        except Exception as e:
-            # Helpful debug so you can see this happening in Render logs
-            print(
-                "DEBUG: safe_json_schema_to_python_type fallback "
-                f"for schema {schema} error: {repr(e)}"
-            )
-            # Fallback type – enough for Gradio's API discovery to work
-            return "any"
-
-    grc_utils.json_schema_to_python_type = _safe_json_schema_to_python_type
-
+    from gradio_client import utils as grc_utils
 except Exception as e:
-    print(f"WARNING: failed to patch gradio_client utils: {e}")
+    print(f"WARNING: could not import gradio_client.utils for patching: {e}")
+else:
+    try:
+        # 1) Patch get_type (existing fix)
+        _orig_get_type = grc_utils.get_type
+
+        def _safe_get_type(schema):
+            """
+            Wrap gradio_client.utils.get_type so it doesn't crash when schema is a
+            bare bool or None.
+            """
+            if isinstance(schema, bool):
+                return "bool"
+            if schema is None:
+                return "any"
+            return _orig_get_type(schema)
+
+        grc_utils.get_type = _safe_get_type
+
+        # 2) Patch json_schema_to_python_type in a version-agnostic way
+        _orig_json_schema_to_python_type = grc_utils.json_schema_to_python_type
+
+        def _safe_json_schema_to_python_type(*args, **kwargs):
+            """
+            Wrap gradio_client.utils.json_schema_to_python_type so that if it
+            explodes (RecursionError, APIInfoParseError, TypeError, etc.),
+            we fall back to a generic 'any' type instead of killing /info.
+            """
+            try:
+                return _orig_json_schema_to_python_type(*args, **kwargs)
+            except Exception as e:
+                schema = args[0] if args else None
+                # Keep log short but useful
+                try:
+                    schema_preview = str(schema)
+                    if len(schema_preview) > 200:
+                        schema_preview = schema_preview[:200] + "...(truncated)..."
+                except Exception:
+                    schema_preview = repr(schema)
+
+                print(
+                    "DEBUG: safe_json_schema_to_python_type fallback; "
+                    f"schema={schema_preview} error: {repr(e)}"
+                )
+                # Fallback type – enough for Gradio's API discovery to work
+                return "any"
+
+        grc_utils.json_schema_to_python_type = _safe_json_schema_to_python_type
+
+    except Exception as e:
+        print(f"WARNING: failed to patch gradio_client utils: {e}")
 # ==================================================================
 
 # Apply monkeypatch
