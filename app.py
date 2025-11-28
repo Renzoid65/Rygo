@@ -12,33 +12,52 @@ import gradio as gr
 import gradio_client.utils as grc_utils
 
 # ---- PATCH: make gradio_client.utils.get_type robust to non-dict schemas ----
+# ========== PATCH: WORK AROUND GRADIO BOOL-SCHEMA + DATAFRAME BUG ==========
 try:
+    # 1) Patch get_type (your existing fix)
     _orig_get_type = grc_utils.get_type
-except AttributeError:
-    _orig_get_type = None
 
-def _safe_get_type(schema):
-    """
-    Work around a Gradio bug where get_type() assumes `schema` is a dict.
-    On Render we sometimes see schema=True (bool), which causes:
-        TypeError: argument of type 'bool' is not iterable
-    inside the original get_type implementation.
-    For any non-dict schema, just treat as "Any".
-    """
-    # If schema is not a dict (e.g. True / False), don't try to inspect keys
-    if not isinstance(schema, dict):
-        print("DEBUG: safe_get_type handling non-dict schema:", repr(schema))
-        return "Any"
-
-    if _orig_get_type is None:
-        # Fallback: best-effort guess
-        return str(schema.get("type", "Any"))
-
-    try:
+    def _safe_get_type(schema):
+        """
+        Wrap gradio_client.utils.get_type so it doesn't crash when schema is a
+        bare bool.
+        This avoids:
+            TypeError: argument of type 'bool' is not iterable
+        """
+        if isinstance(schema, bool):
+            return "bool"
+        if schema is None:
+            return "any"
         return _orig_get_type(schema)
-    except Exception as e:  # very defensive
-        print("DEBUG: safe_get_type caught error for schema", repr(schema), "error:", repr(e))
-        return "Any"
+
+    grc_utils.get_type = _safe_get_type
+
+    # 2) NEW: Patch json_schema_to_python_type to swallow the DataframeData recursion
+    _orig_json_schema_to_python_type = grc_utils.json_schema_to_python_type
+
+    def _safe_json_schema_to_python_type(schema, defs=None):
+        """
+        Wrap gradio_client.utils.json_schema_to_python_type so that if it
+        explodes (e.g. RecursionError / APIInfoParseError on DataframeData),
+        we just fall back to a generic 'any' type instead of killing /info.
+        This keeps the Gradio frontend from showing 'Error - no API found'.
+        """
+        try:
+            return _orig_json_schema_to_python_type(schema, defs)
+        except Exception as e:
+            # Helpful debug so you can see this happening in Render logs
+            print(
+                "DEBUG: safe_json_schema_to_python_type fallback "
+                f"for schema {schema} error: {repr(e)}"
+            )
+            # Fallback type – enough for Gradio's API discovery to work
+            return "any"
+
+    grc_utils.json_schema_to_python_type = _safe_json_schema_to_python_type
+
+except Exception as e:
+    print(f"WARNING: failed to patch gradio_client utils: {e}")
+# ==================================================================
 
 # Apply monkeypatch
 grc_utils.get_type = _safe_get_type
