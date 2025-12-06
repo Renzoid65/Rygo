@@ -16,6 +16,7 @@ import time
 import json
 import os
 
+
 # ===== Optional QR: try qrcode, else Pillow fallback (no crash on Spaces) =====
 try:
     import qrcode  # external; may not exist on Spaces
@@ -352,12 +353,8 @@ def launch_accesspoints_module(get_user_id=None):
 
 
     # ========== MAIN MODULE ==========
-    
-    with gr.Blocks() as demo:
-        
-        # Inject APGROUP_WARNING_CSS via a <style> tag
-        gr.HTML(f"<style>{APGROUP_WARNING_CSS}</style>")
-        
+    with gr.Blocks(css=APGROUP_WARNING_CSS) as demo:
+
         with gr.Tab("Manage Access Points"):
 
             # ---- property options for current user ----

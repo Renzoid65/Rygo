@@ -228,18 +228,33 @@ def launch_installers_module(get_user_id=None):
                 return resolve_and_cache_uid(get_user_id)
 
             def _prime_uid_then_fill_properties():
+                """
+                Resolve the ActiveUserID and fill the installer property dropdown.
+            
+                Returns a gr.update for prop_dropdown.
+                """
+                # Wait briefly for the UID (same pattern as other modules)
                 deadline = time.time() + 10.0
                 while resolve_and_cache_uid(get_user_id) is None and time.time() < deadline:
                     time.sleep(0.1)
             
                 uid = _uid()
-                print("DEBUG (prime): starting with UID =", uid)
+                print("DEBUG installers _prime_uid_then_fill_properties → uid =", uid)
             
+                # If we still don't have a UID, show an empty but visible dropdown
                 if uid is None:
-                    # Keep it visible but disabled so the user sees it’s waiting for a valid UID
-                    return gr.update(choices=[], value=None, interactive=False, visible=True)
-           
+                    prop_map.clear()
+                    return gr.update(
+                        choices=[],
+                        value=None,
+                        interactive=False,
+                        visible=True,
+                    )
+            
+                # Load installer properties based on APInstallerID
                 options = load_property_options()  # [(label, value), ...]
+                print("DEBUG installers _prime_uid_then_fill_properties → options:", options)
+            
                 labels = [str(lbl).strip() for (lbl, _v) in options]
             
                 # Rebuild mapping every time
@@ -247,15 +262,20 @@ def launch_installers_module(get_user_id=None):
                 for lbl, val in options:
                     # val looks like: f"{prop_id}|{pname}|{owner}"
                     parts = val.split("|")
-                    pid  = int(parts[0]) if parts and parts[0].isdigit() else None
+                    pid = int(parts[0]) if parts and parts[0].isdigit() else None
                     pname = parts[1] if len(parts) > 1 else ""
                     owner = parts[2] if len(parts) > 2 else ""
                     prop_map[lbl] = (pid, pname, owner)
             
-                # Explicitly visible + interactive toggle
-                return gr.update(choices=labels, value=None, interactive=bool(labels), visible=True)
+                # Ensure the dropdown is visible and interactive if there are any choices
+                return gr.update(
+                    choices=labels,
+                    value=None,
+                    interactive=bool(labels),
+                    visible=True,
+                )
 
-
+            
 
             # ---------------------- table sync ----------------------
             def sync_accesspoints(prop_id):
@@ -510,7 +530,7 @@ def launch_installers_module(get_user_id=None):
             prop_map: Dict[str, tuple[int | None, str, str]] = {}
             print("DEBUG (prime): starting with UID =", _uid())
 
-            prop_dropdown = gr.Dropdown(label="Select Property (Owner)", choices=[], value=None)
+            prop_dropdown = gr.Dropdown(label="Select Property (Owner)", choices=[], value=None, visible=True, interactive=False,)     
             
             btn_reload_props = gr.Button("Reload Properties", variant="secondary")
             btn_reload_props.click(_prime_uid_then_fill_properties, outputs=[prop_dropdown])

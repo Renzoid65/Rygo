@@ -1096,7 +1096,8 @@ def launch_permissions_module(get_user_id=None):
                         pass
                     return new_mode(new_country_label, new_mobile)
 
-                tenant_full_mobile = f"+{country_digits}0{local_nine}"
+#                tenant_full_mobile = f"+{country_digits}0{local_nine}"
+                tenant_full_mobile = f"+{country_digits}{local_nine}"
 
                 # Look up in user_details
                 conn = get_connection()
@@ -1536,7 +1537,7 @@ def launch_permissions_module(get_user_id=None):
                     edit_car_b = gr.Textbox(label="User's Car Licence B")
                     edit_active = gr.Checkbox(label="Tick to Activate User", value=True)
                     edit_afterhours = gr.Checkbox(label="Tick for After-Hours Access", value=False)
-                    edit_allaps = gr.Checkbox(label="Tick to allow ALL AP Groups", value=False)
+                    edit_allaps = gr.Checkbox(label="Tick for ALL AP Groups Access", value=False)
 
                 gr.Markdown(
                     """<div style="background-color:#666666; color:#FFFFFF; padding:10px; border-radius:0px;">Updated User's Details</div>"""
